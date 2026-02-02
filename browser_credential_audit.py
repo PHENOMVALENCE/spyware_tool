@@ -690,88 +690,92 @@ class BrowserCredentialAuditor:
     
     def _extract_cache_files(self, limit: int = 500) -> List[Dict]:
         """
-        Extract actual cache files (HTML, CSS, JavaScript) from browser cache.
+        Extract cache file listing from browser cache.
         
-        Browser cache stores actual file content in the Cache directory.
-        This method scans for HTML, CSS, and JavaScript files.
+        Chromium stores cache as block files (data_0, data_1, f_000001, etc.) with
+        no extension — not as separate .html/.css/.js files. This method lists all
+        cache files (blocks + any named assets) so the simulator shows cache presence.
         
         Args:
             limit: Maximum number of cache files to retrieve (default: 500)
             
         Returns:
-            List of cache file dictionaries
+            List of cache file info dictionaries
         """
         cache_files = []
         cache_path = self.browser_paths['cache']
         code_cache_path = self.browser_paths['code_cache']
+        # Parent Cache folder (Chrome may put index etc. here)
+        cache_parent = cache_path.parent if cache_path else None
         
-        print("[INFO] Scanning browser cache for HTML, CSS, and JavaScript files...")
+        print("[INFO] Scanning browser cache (Cache_Data + Code Cache)...")
         
-        # File extensions to look for
-        target_extensions = {'.html', '.htm', '.css', '.js', '.mjs'}
+        def file_type_from_name(name: str, ext: str) -> str:
+            """Label cache entry by extension or default to Cache block."""
+            if ext in {'.html', '.htm'}:
+                return 'HTML'
+            if ext == '.css':
+                return 'CSS'
+            if ext in {'.js', '.mjs', '.cjs'}:
+                return 'JavaScript'
+            if name in ('index', 'index-dir') or name.startswith('data_') or name.startswith('f_'):
+                return 'Cache block'
+            return 'Cache data'
         
-        def scan_cache_directory(directory, depth=0, max_depth=3):
-            """Recursively scan cache directory for target files."""
-            if depth > max_depth or not directory.exists():
+        def scan_cache_directory(directory, depth=0, max_depth=4):
+            """Recursively scan cache directory; include ALL files (Chromium uses extensionless blocks)."""
+            if depth > max_depth or not directory or not directory.exists():
                 return
             
             try:
                 for item in directory.iterdir():
                     if item.is_file():
-                        # Check file extension
-                        if item.suffix.lower() in target_extensions:
+                        try:
+                            file_size = item.stat().st_size
+                            modified_time = datetime.fromtimestamp(item.stat().st_mtime)
+                            ext = item.suffix.lower() if item.suffix else ''
+                            ftype = file_type_from_name(item.name, ext)
+                            # Preview: try first bytes for text, else note binary
                             try:
-                                file_size = item.stat().st_size
-                                modified_time = datetime.fromtimestamp(item.stat().st_mtime)
-                                
-                                # Determine file type
-                                file_type = 'HTML' if item.suffix.lower() in {'.html', '.htm'} else \
-                                           'CSS' if item.suffix.lower() == '.css' else 'JavaScript'
-                                
-                                # Try to read first few bytes to get URL or content preview
-                                try:
-                                    with open(item, 'rb') as f:
-                                        content_preview = f.read(200).decode('utf-8', errors='ignore')
-                                except:
-                                    content_preview = '[Binary or unreadable]'
-                                
-                                cache_file = {
-                                    'path': str(item),
-                                    'filename': item.name,
-                                    'type': file_type,
-                                    'size': self._format_file_size(file_size),
-                                    'size_bytes': file_size,
-                                    'modified': modified_time,
-                                    'preview': content_preview[:100]
-                                }
-                                
-                                cache_files.append(cache_file)
-                                
-                                if len(cache_files) >= limit:
-                                    return
-                                    
-                            except Exception as e:
-                                # Skip files we can't access
-                                continue
+                                with open(item, 'rb') as f:
+                                    raw = f.read(200)
+                                content_preview = raw.decode('utf-8', errors='ignore')[:100]
+                                if not content_preview.strip():
+                                    content_preview = '[Binary/block data]'
+                            except Exception:
+                                content_preview = '[Unreadable]'
+                            
+                            cache_files.append({
+                                'path': str(item),
+                                'filename': item.name,
+                                'type': ftype,
+                                'size': self._format_file_size(file_size),
+                                'size_bytes': file_size,
+                                'modified': modified_time,
+                                'preview': content_preview,
+                            })
+                            if len(cache_files) >= limit:
+                                return
+                        except (PermissionError, OSError):
+                            continue
                     elif item.is_dir() and depth < max_depth:
                         scan_cache_directory(item, depth + 1, max_depth)
-                        
             except PermissionError:
-                # Skip directories we can't access
                 pass
-            except Exception as e:
-                # Skip on other errors
+            except Exception:
                 pass
         
-        # Scan main cache directory
+        # Scan Cache_Data (main cache blocks)
         if cache_path.exists():
             scan_cache_directory(cache_path)
-        
-        # Scan code cache directory (JavaScript files)
+        # Scan parent Cache folder (index, etc.)
+        if cache_parent and cache_parent.exists() and len(cache_files) < limit:
+            scan_cache_directory(cache_parent, max_depth=1)
+        # Scan Code Cache (V8/JS cache; often has subdirs with more files)
         if code_cache_path.exists():
             scan_cache_directory(code_cache_path)
         
-        print(f"[INFO] Found {len(cache_files)} cache files (HTML/CSS/JS)")
+        print(f"[INFO] Found {len(cache_files)} cache entries (blocks + assets)")
         return cache_files
     
     def _list_downloaded_files(self) -> List[Dict]:

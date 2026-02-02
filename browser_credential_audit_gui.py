@@ -10,6 +10,7 @@ EDUCATIONAL USE ONLY - For Blue Team Training and Security Posture Assessment
 
 import os
 import sys
+import json
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 from datetime import datetime
@@ -159,15 +160,21 @@ class CredentialAuditGUI:
         )
         self.run_button.grid(row=6, column=0, sticky=tk.W, pady=(0, 10))
         
-        # Export button
-        self.export_button = ttk.Button(
+        # Save collected data (main save - all data to one file)
+        self.save_data_button = ttk.Button(
             control_frame,
-            text="Export Results",
-            command=self.export_results,
+            text="Save collected data",
+            command=self.save_collected_data,
             width=20,
             state='disabled'
         )
-        self.export_button.grid(row=7, column=0, sticky=tk.W, pady=(0, 10))
+        self.save_data_button.grid(row=7, column=0, sticky=tk.W, pady=(0, 5))
+        ttk.Label(
+            control_frame,
+            text="(to a file — not sent anywhere)",
+            font=('Arial', 8),
+            foreground='gray'
+        ).grid(row=8, column=0, sticky=tk.W, pady=(0, 10))
         
         # Clear button
         clear_button = ttk.Button(
@@ -176,11 +183,11 @@ class CredentialAuditGUI:
             command=self.clear_results,
             width=20
         )
-        clear_button.grid(row=8, column=0, sticky=tk.W, pady=(0, 20))
+        clear_button.grid(row=10, column=0, sticky=tk.W, pady=(0, 20))
         
         # Status section
         ttk.Label(control_frame, text="Status:", style='Heading.TLabel').grid(
-            row=9, column=0, sticky=tk.W, pady=(0, 5)
+            row=11, column=0, sticky=tk.W, pady=(0, 5)
         )
         
         self.status_label = ttk.Label(
@@ -189,7 +196,7 @@ class CredentialAuditGUI:
             style='Status.TLabel',
             foreground='green'
         )
-        self.status_label.grid(row=10, column=0, sticky=tk.W, pady=(0, 10))
+        self.status_label.grid(row=12, column=0, sticky=tk.W, pady=(0, 10))
         
         # Progress bar
         self.progress = ttk.Progressbar(
@@ -197,11 +204,11 @@ class CredentialAuditGUI:
             mode='indeterminate',
             length=200
         )
-        self.progress.grid(row=11, column=0, sticky=tk.W, pady=(0, 10))
+        self.progress.grid(row=13, column=0, sticky=tk.W, pady=(0, 10))
         
         # Info section
         info_frame = ttk.LabelFrame(control_frame, text="Information", padding="10")
-        info_frame.grid(row=12, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        info_frame.grid(row=14, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
         
         info_text = """
 ⚠️ EDUCATIONAL USE ONLY
@@ -234,12 +241,6 @@ training purposes.
         credentials_frame.columnconfigure(0, weight=1)
         credentials_frame.rowconfigure(0, weight=1)
         
-        # History Tab
-        history_frame = ttk.Frame(results_notebook, padding="10")
-        results_notebook.add(history_frame, text="History")
-        history_frame.columnconfigure(0, weight=1)
-        history_frame.rowconfigure(0, weight=1)
-        
         # Downloads Tab
         downloads_frame = ttk.Frame(results_notebook, padding="10")
         results_notebook.add(downloads_frame, text="Downloads")
@@ -258,11 +259,21 @@ training purposes.
         downloaded_files_frame.columnconfigure(0, weight=1)
         downloaded_files_frame.rowconfigure(0, weight=1)
         
-        # Detection Tab
+        # History Tab (frame kept for internal use, not added as a tab)
+        history_frame = ttk.Frame(results_notebook, padding="10")
+        history_frame.columnconfigure(0, weight=1)
+        history_frame.rowconfigure(0, weight=1)
+        
+        # Detection Tab (frame kept for internal use, not added as a tab)
         detection_frame = ttk.Frame(results_notebook, padding="10")
-        results_notebook.add(detection_frame, text="Detection")
         detection_frame.columnconfigure(0, weight=1)
         detection_frame.rowconfigure(0, weight=1)
+        
+        # Simulation Summary Tab (monitor + collect + export locally)
+        simulation_frame = ttk.Frame(results_notebook, padding="10")
+        results_notebook.add(simulation_frame, text="Simulation Summary")
+        simulation_frame.columnconfigure(0, weight=1)
+        simulation_frame.rowconfigure(1, weight=1)
         
         # Credentials Results
         results_frame = ttk.LabelFrame(credentials_frame, text="Credentials", padding="10")
@@ -571,6 +582,31 @@ training purposes.
         )
         self.detection_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
+        # Simulation Summary content
+        sim_results_frame = ttk.LabelFrame(simulation_frame, text="Save collected data — to a file (not sent anywhere)", padding="10")
+        sim_results_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        sim_results_frame.columnconfigure(0, weight=1)
+        sim_results_frame.rowconfigure(1, weight=1)
+        
+        sim_btn_frame = ttk.Frame(sim_results_frame)
+        sim_btn_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        self.simulate_export_btn = ttk.Button(
+            sim_btn_frame,
+            text="Save collected data",
+            command=self.save_collected_data,
+            state='disabled'
+        )
+        self.simulate_export_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.simulation_summary_text = scrolledtext.ScrolledText(
+            sim_results_frame,
+            wrap=tk.WORD,
+            font=('Consolas', 9),
+            state='disabled',
+            height=12
+        )
+        self.simulation_summary_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
         # Log/Status text area
         log_frame = ttk.LabelFrame(main_frame, text="Log", padding="10")
         log_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
@@ -647,7 +683,8 @@ training purposes.
             f"Are you ready to audit {browser}?\n\n"
             "⚠️ Make sure:\n"
             "• Browser is completely closed\n"
-            "• You're running as the correct Windows user{history_text}\n\n"
+            "• You're running as the correct Windows user"
+            + (f"\n• Options: {options_text}" if options_text else "") + "\n\n"
             "Continue?",
             icon='warning'
         )
@@ -661,7 +698,7 @@ training purposes.
         # Start audit in thread
         self.audit_running = True
         self.run_button.config(state='disabled')
-        self.export_button.config(state='disabled')
+        self.save_data_button.config(state='disabled')
         self.progress.start()
         self.update_status("Running audit...", 'blue')
         
@@ -799,7 +836,6 @@ training purposes.
             
             if credentials:
                 self.populate_tree(credentials)
-                self.export_button.config(state='normal')
                 
                 msg = f"Successfully extracted {len(credentials)} credentials."
                 if history:
@@ -827,6 +863,14 @@ training purposes.
                     "• Browser data is stored elsewhere"
                 )
             
+            # Enable save whenever we have any collected data
+            self.save_data_button.config(state='normal')
+            
+            # Always update simulation summary and enable save (even if no credentials)
+            self.update_simulation_summary()
+            self.simulate_export_btn.config(state='normal')
+            self.save_data_button.config(state='normal')
+            
             # Populate all result views
             if history:
                 self.populate_history_tree(history)
@@ -838,6 +882,117 @@ training purposes.
                 self.populate_downloaded_files_tree(downloaded_files)
             if detections:
                 self.populate_detection_results(detections)
+    
+    def _serialize_for_json(self, obj):
+        """Convert audit result items to JSON-serializable form (e.g. datetime -> ISO string)."""
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        if isinstance(obj, dict):
+            return {k: self._serialize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._serialize_for_json(v) for v in obj]
+        return obj
+    
+    def update_simulation_summary(self):
+        """Update the Simulation Summary tab with what was monitored and collected."""
+        self.simulation_summary_text.config(state='normal')
+        self.simulation_summary_text.delete(1.0, tk.END)
+        
+        cred_count = len(self.credentials)
+        hist_count = len(self.history)
+        dl_count = len(self.downloads)
+        cache_count = len(self.cache_files)
+        dl_files_count = len(self.downloaded_files)
+        
+        lines = [
+            "SIMULATION SUMMARY – What this tool can access (for training only)",
+            "=" * 70,
+            "",
+            "1. MONITOR / ACCESS",
+            "   The tool reads browser data that an attacker would target:",
+            "   • Saved passwords (Login Data + Local State)",
+            "   • Browser history (History DB)",
+            "   • Download history (History DB)",
+            "   • Browser cache (Cache / Code Cache)",
+            "   • Downloaded files list (Downloads folder)",
+            "",
+            "2. COLLECTED (this run)",
+            f"   • Saved passwords:  {cred_count}",
+            f"   • History entries:  {hist_count}",
+            f"   • Download records: {dl_count}",
+            f"   • Cache files:      {cache_count}",
+            f"   • Files in Downloads folder: {dl_files_count}",
+            "",
+            "3. SAVE COLLECTED DATA (local file only)",
+            "   Use 'Save collected data' to save everything to a file.",
+            "   Data is saved only to your chosen file — not sent to any third party.",
+            "",
+            "=" * 70,
+        ]
+        self.simulation_summary_text.insert(tk.END, "\n".join(lines))
+        self.simulation_summary_text.config(state='disabled')
+    
+    def save_collected_data(self):
+        """Save all collected data to a file. Data is saved locally only — not sent anywhere."""
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[
+                ("JSON (all data)", "*.json"),
+                ("Text report", "*.txt"),
+                ("All files", "*.*")
+            ],
+            title="Save collected data (to a file — not sent to any third party)"
+        )
+        if not filename:
+            return
+        self._write_collected_data_to_file(filename)
+
+    def _write_collected_data_to_file(self, filename):
+        """Write all collected data to filename. Local file only — nothing sent over network."""
+        try:
+            payload = {
+                "collected_data": True,
+                "timestamp": datetime.now().isoformat(),
+                "summary": {
+                    "credentials_count": len(self.credentials),
+                    "history_count": len(self.history),
+                    "downloads_count": len(self.downloads),
+                    "cache_files_count": len(self.cache_files),
+                    "downloaded_files_count": len(self.downloaded_files),
+                    "detection_risk": self.detections.get("risk_level", "N/A") if self.detections else "N/A",
+                },
+                "credentials": self._serialize_for_json(self.credentials),
+                "history": self._serialize_for_json(self.history),
+                "downloads": self._serialize_for_json(self.downloads),
+                "cache_files": self._serialize_for_json(self.cache_files),
+                "downloaded_files": self._serialize_for_json(self.downloaded_files),
+                "detections": self._serialize_for_json(self.detections) if self.detections else {},
+            }
+            
+            if filename.lower().endswith(".json"):
+                with open(filename, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2, ensure_ascii=False)
+            else:
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write("COLLECTED DATA REPORT\n")
+                    f.write("=" * 70 + "\n\n")
+                    f.write(json.dumps(payload["summary"], indent=2) + "\n\n")
+                    f.write("Full data saved as JSON for review.\n")
+                    if not filename.lower().endswith(".json"):
+                        json_path = filename.rsplit(".", 1)[0] + "_full.json"
+                        with open(json_path, "w", encoding="utf-8") as jf:
+                            json.dump(payload, jf, indent=2, ensure_ascii=False)
+                        f.write(f"Full data saved to: {json_path}\n")
+            
+            self.log(f"Collected data saved to: {filename}", "SUCCESS")
+            messagebox.showinfo(
+                "Saved",
+                f"Collected data saved to:\n{filename}\n\n"
+                "Data is stored only in this file. Nothing is sent to any third party."
+            )
+        except Exception as e:
+            self.log(f"Save collected data failed: {e}", "ERROR")
+            messagebox.showerror("Save failed", str(e))
     
     def populate_tree(self, credentials):
         """Populate the results treeview with credentials."""
@@ -1075,6 +1230,13 @@ training purposes.
         self.detection_text.delete(1.0, tk.END)
         self.detection_text.config(state='disabled')
         self.detection_risk_label.config(text="No detection performed yet", foreground='black')
+        
+        self.simulation_summary_text.config(state='normal')
+        self.simulation_summary_text.delete(1.0, tk.END)
+        self.simulation_summary_text.insert(tk.END, "Run an audit to see what was collected, then use 'Save collected data' to save to a file.")
+        self.simulation_summary_text.config(state='disabled')
+        self.simulate_export_btn.config(state='disabled')
+        self.save_data_button.config(state='disabled')
     
     def clear_results(self):
         """Clear all results and log."""
@@ -1085,200 +1247,12 @@ training purposes.
         self.cache_files = []
         self.downloaded_files = []
         self.detections = {}
-        self.export_button.config(state='disabled')
+        self.save_data_button.config(state='disabled')
         self.log_text.config(state='normal')
         self.log_text.delete(1.0, tk.END)
         self.log_text.config(state='disabled')
         self.log("Results cleared. Ready for new audit.")
         self.update_status("Ready", 'green')
-    
-    def export_results(self):
-        """Export results to a text file."""
-        if not self.credentials:
-            messagebox.showwarning("No Results", "No credentials to export.")
-            return
-        
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[
-                ("Text files", "*.txt"),
-                ("CSV files", "*.csv"),
-                ("All files", "*.*")
-            ],
-            title="Export Credentials"
-        )
-        
-        if not filename:
-            return
-        
-        try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                f.write("=" * 100 + "\n")
-                f.write("Browser Credential Audit Results\n")
-                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write("=" * 100 + "\n\n")
-                
-                f.write(f"{'URL':<50} | {'Username':<30} | {'Password':<25} | {'Last Used':<20} | {'Times Used':<10}\n")
-                f.write("-" * 100 + "\n")
-                
-                for cred in self.credentials:
-                    url = cred['url'] or '[No URL]'
-                    username = cred['username'] or '[No Username]'
-                    password = cred['password'] or '[No Password]'
-                    
-                    if cred['last_used']:
-                        last_used = cred['last_used'].strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        last_used = 'Never'
-                    
-                    times_used = str(cred['times_used'] or 0)
-                    
-                    f.write(f"{url[:47]:<50} | {username[:27]:<30} | {password[:22]:<25} | {last_used:<20} | {times_used:<10}\n")
-                
-                f.write("\n" + "=" * 100 + "\n")
-                f.write(f"Total Credentials: {len(self.credentials)}\n")
-                f.write("=" * 100 + "\n")
-                
-                # Export history if available
-                if self.history:
-                    f.write("\n\n" + "=" * 100 + "\n")
-                    f.write("BROWSER HISTORY\n")
-                    f.write("=" * 100 + "\n\n")
-                    
-                    f.write(f"{'URL':<60} | {'Title':<40} | {'Visit Count':<12} | {'Last Visit':<20} | {'Type':<15}\n")
-                    f.write("-" * 100 + "\n")
-                    
-                    for entry in self.history:
-                        url = entry['url'] or '[No URL]'
-                        title = entry['title'] or '[No Title]'
-                        visit_count = str(entry['visit_count'] or 0)
-                        
-                        if entry['last_visit']:
-                            last_visit = entry['last_visit'].strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            last_visit = 'Unknown'
-                        
-                        transition = entry.get('transition', 'Unknown')
-                        
-                        f.write(f"{url[:57]:<60} | {title[:37]:<40} | {visit_count:<12} | {last_visit:<20} | {transition:<15}\n")
-                    
-                    f.write("\n" + "=" * 100 + "\n")
-                    f.write(f"Total History Entries: {len(self.history)}\n")
-                    f.write("=" * 100 + "\n")
-                
-                # Export downloads if available
-                if self.downloads:
-                    f.write("\n\n" + "=" * 100 + "\n")
-                    f.write("DOWNLOAD HISTORY\n")
-                    f.write("=" * 100 + "\n\n")
-                    
-                    f.write(f"{'URL':<50} | {'Filename':<30} | {'Size':<12} | {'State':<15} | {'Danger':<15} | {'Start Time':<20} | {'Opened':<8}\n")
-                    f.write("-" * 100 + "\n")
-                    
-                    for entry in self.downloads:
-                        url = entry['url'] or '[No URL]'
-                        filename = entry['filename'] or '[Unknown File]'
-                        size = entry['size'] or 'Unknown'
-                        state = entry['state'] or 'Unknown'
-                        danger = entry['danger_type'] or 'Unknown'
-                        
-                        if entry['start_time']:
-                            start_time = entry['start_time'].strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            start_time = 'Unknown'
-                        
-                        opened = 'Yes' if entry['opened'] else 'No'
-                        
-                        f.write(f"{url[:47]:<50} | {filename[:27]:<30} | {size:<12} | {state:<15} | {danger:<15} | {start_time:<20} | {opened:<8}\n")
-                    
-                    f.write("\n" + "=" * 100 + "\n")
-                    f.write(f"Total Download Entries: {len(self.downloads)}\n")
-                    f.write("=" * 100 + "\n")
-                
-                # Export cache files if available
-                if self.cache_files:
-                    f.write("\n\n" + "=" * 100 + "\n")
-                    f.write("CACHE FILES (HTML/CSS/JavaScript)\n")
-                    f.write("=" * 100 + "\n\n")
-                    
-                    f.write(f"{'Filename':<50} | {'Type':<12} | {'Size':<12} | {'Modified':<20}\n")
-                    f.write("-" * 100 + "\n")
-                    
-                    for entry in self.cache_files:
-                        filename = entry['filename'] or '[Unknown]'
-                        file_type = entry['type'] or 'Unknown'
-                        size = entry['size'] or 'Unknown'
-                        modified = entry['modified'].strftime('%Y-%m-%d %H:%M:%S') if entry.get('modified') else 'Unknown'
-                        
-                        f.write(f"{filename[:47]:<50} | {file_type:<12} | {size:<12} | {modified:<20}\n")
-                    
-                    f.write("\n" + "=" * 100 + "\n")
-                    f.write(f"Total Cache Files: {len(self.cache_files)}\n")
-                    f.write("=" * 100 + "\n")
-                
-                # Export downloaded files if available
-                if self.downloaded_files:
-                    f.write("\n\n" + "=" * 100 + "\n")
-                    f.write("DOWNLOADED FILES (Downloads Folder)\n")
-                    f.write("=" * 100 + "\n\n")
-                    
-                    f.write(f"{'Filename':<50} | {'Type':<15} | {'Size':<12} | {'Suspicious':<12} | {'Modified':<20}\n")
-                    f.write("-" * 100 + "\n")
-                    
-                    for entry in self.downloaded_files:
-                        filename = entry['filename'] or '[Unknown]'
-                        file_type = entry['type'] or 'Unknown'
-                        size = entry['size'] or 'Unknown'
-                        suspicious = 'YES' if entry.get('suspicious', False) else 'NO'
-                        modified = entry['modified'].strftime('%Y-%m-%d %H:%M:%S') if entry.get('modified') else 'Unknown'
-                        
-                        f.write(f"{filename[:47]:<50} | {file_type:<15} | {size:<12} | {suspicious:<12} | {modified:<20}\n")
-                        
-                        if entry.get('suspicious', False) and entry.get('indicators'):
-                            f.write(f"  Indicators: {', '.join(entry['indicators'])}\n")
-                    
-                    f.write("\n" + "=" * 100 + "\n")
-                    f.write(f"Total Downloaded Files: {len(self.downloaded_files)}\n")
-                    suspicious_count = sum(1 for f in self.downloaded_files if f.get('suspicious', False))
-                    f.write(f"Suspicious Files: {suspicious_count}\n")
-                    f.write("=" * 100 + "\n")
-                
-                # Export detection results if available
-                if self.detections:
-                    f.write("\n\n" + "=" * 100 + "\n")
-                    f.write("UNAUTHORIZED ACCESS DETECTION\n")
-                    f.write("=" * 100 + "\n\n")
-                    
-                    f.write(f"Risk Level: {self.detections.get('risk_level', 'UNKNOWN')}\n")
-                    f.write(f"Timestamp: {self.detections.get('timestamp', 'Unknown')}\n\n")
-                    
-                    unauthorized = self.detections.get('unauthorized_access', [])
-                    if unauthorized:
-                        f.write(f"Unauthorized Access Patterns ({len(unauthorized)}):\n")
-                        f.write("-" * 100 + "\n")
-                        for access in unauthorized:
-                            f.write(f"\nFile: {access['file']}\n")
-                            f.write(f"  Type: {access['type']}\n")
-                            f.write(f"  Risk: {access['risk']}\n")
-                            f.write(f"  Description: {access['description']}\n")
-                    
-                    suspicious = self.detections.get('suspicious_files', [])
-                    if suspicious:
-                        f.write(f"\n\nSuspicious Files ({len(suspicious)}):\n")
-                        f.write("-" * 100 + "\n")
-                        for file in suspicious:
-                            f.write(f"\n{file['filename']}\n")
-                            f.write(f"  Indicators: {', '.join(file.get('indicators', []))}\n")
-                    
-                    f.write("\n" + "=" * 100 + "\n")
-            
-            self.log(f"Results exported to: {filename}", 'SUCCESS')
-            messagebox.showinfo("Export Complete", f"Results exported to:\n{filename}")
-            
-        except Exception as e:
-            error_msg = f"Failed to export: {str(e)}"
-            self.log(error_msg, 'ERROR')
-            messagebox.showerror("Export Failed", error_msg)
 
 
 def main():

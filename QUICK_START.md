@@ -60,6 +60,24 @@ python browser_credential_audit.py
 - You must run as the same Windows user who saved the passwords
 - Check that Local State file exists and is readable
 
+## Block the simulator: Browser Data Guard
+
+To **block** the simulator from reading Chrome/Edge passwords and history:
+
+**Option 1 – GUI (easiest)**  
+1. Close Chrome and Edge (and for Edge: end **msedgewebview2.exe** in Task Manager if needed).  
+2. Double-click **`run_guard_gui.bat`** (or run `python browser_data_guard_gui.py`).  
+3. Click **Start protection**. The simulator is now blocked.  
+4. Click **Stop protection** when you want to use the browser again.
+
+**Option 2 – Console**  
+1. Close Chrome/Edge completely (check Task Manager).  
+2. Double-click **`run_guard.bat`** or run `python browser_data_guard.py`.  
+3. Keep the window open while you want protection.  
+4. Press **Ctrl+C** to stop and release the files.
+
+**Note:** While protection is on, the browser cannot start (files are locked). Stop the guard when you want to browse again.
+
 ## Next Steps
 
 1. Run the script and select your browser

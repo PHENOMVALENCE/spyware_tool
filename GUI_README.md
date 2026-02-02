@@ -70,6 +70,13 @@ python browser_credential_audit_gui.py
 - Choose location and filename
 - Results saved in structured text format
 
+### Simulation flow (Monitor → Collect → Export)
+The tool simulates what an infostealer can access:
+
+1. **Monitor / Access** – Reads browser data: saved passwords, history, download history, cache, and files in the Downloads folder.
+2. **Collect** – Gathers all of the above into one report (shown in the Credentials, History, Downloads, Cache Files, Downloaded Files, and Detection tabs).
+3. **Simulate exfiltration** – Use the **"Simulation Summary"** tab and **"Export simulation report"** to save the full report to a **local file** (JSON or TXT). No data is sent over the network. For training, you can hand this file to your trainer.
+
 ## GUI Components
 
 ### Control Panel (Left Side)
@@ -81,10 +88,14 @@ python browser_credential_audit_gui.py
 - **Progress Bar**: Visual progress indicator
 - **Information Panel**: Important warnings and requirements
 
-### Results Panel (Right Side)
-- **Results Count**: Number of credentials found
-- **Results Table**: Scrollable table with all credentials
-- **Column Headers**: URL, Username, Password, Last Used, Times Used
+### Results Panel (Right Side) – Tabs
+- **Credentials**: Saved passwords (URL, Username, Password, Last Used, Times Used)
+- **History**: Browser history entries
+- **Downloads**: Download history from the browser
+- **Cache Files**: HTML/CSS/JS files in browser cache
+- **Downloaded Files**: Files in the user’s Downloads folder (with suspicious indicators)
+- **Detection**: Unauthorized access detection results
+- **Simulation Summary**: What was monitored/collected and **Export simulation report** (local file only, no network)
 
 ### Log Area (Bottom)
 - Real-time log output

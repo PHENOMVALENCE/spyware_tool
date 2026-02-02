@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Browser Data Guard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Browser Data Guard</h1>
+    <p class="tagline">Defend against infostealer-style attacks</p>
+
+    <section class="risk">
+      <h2>What’s at risk</h2>
+      <p>Malware and infostealers can read:</p>
+      <ul>
+        <li>Saved passwords (Login Data)</li>
+        <li>Browser cache</li>
+        <li>Download history &amp; Downloads folder</li>
+      </ul>
+      <p>They do this by reading files on disk when the browser is closed or by copying DBs while it’s running.</p>
+    </section>
+
+    <section class="defense">
+      <h2>How to defend</h2>
+      <ul>
+        <li><strong>Use a password manager</strong> (e.g. Bitwarden, 1Password) instead of saving passwords in the browser.</li>
+        <li><strong>Close the browser</strong> when you leave your PC so sensitive files aren’t left in memory.</li>
+        <li><strong>Keep Windows &amp; antivirus updated</strong> and avoid running unknown scripts or executables.</li>
+        <li><strong>Don’t store sensitive files</strong> only in the Downloads folder; move or delete them when done.</li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>This extension does not access your data. It only shows tips to reduce risk.</p>
+    </footer>
+  </div>
+</body>
+</html>

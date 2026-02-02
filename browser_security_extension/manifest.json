@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Browser Data Guard",
+  "version": "1.0",
+  "description": "Security awareness: protect saved passwords, cache, and downloads from infostealer-style attacks.",
+  "permissions": [],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Browser Data Guard"
+  }
+}
